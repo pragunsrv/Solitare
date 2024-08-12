@@ -10,6 +10,7 @@ CARD_WIDTH, CARD_HEIGHT = 70, 100
 BACKGROUND_COLOR = (0, 128, 0)
 CARD_BACK_COLOR = (0, 0, 128)
 FPS = 30
+FONT_COLOR = (255, 255, 255)
 
 # Colors for suits
 SUIT_COLORS = {
@@ -37,6 +38,9 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Solitaire")
 clock = pygame.time.Clock()
 
+# Font setup
+font = pygame.font.SysFont(None, 36)
+
 # Card setup
 deck = load_card_images()
 cards = list(deck.keys())
@@ -46,6 +50,7 @@ random.shuffle(cards)
 flipped_cards = [False] * len(cards)
 stacks = [[] for _ in range(7)]
 foundations = [[] for _ in range(4)]
+game_won = False
 
 # Deal cards into stacks
 for i in range(7):
@@ -71,6 +76,10 @@ def draw_cards():
             screen.blit(deck[foundation[-1]], (x, y))
         else:
             pygame.draw.rect(screen, (255, 255, 255), (x, y, CARD_WIDTH, CARD_HEIGHT))
+
+def draw_text(text, pos):
+    text_surface = font.render(text, True, FONT_COLOR)
+    screen.blit(text_surface, pos)
 
 # Flip a card
 def flip_card(stack_index):
@@ -104,6 +113,17 @@ def is_valid_foundation_move(card, foundation):
     value_order = {'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13}
 
     return suit == top_suit and value_order[value] == value_order[top_value] + 1
+
+# Auto-move to foundation
+def auto_move_to_foundation():
+    for i in range(7):
+        if stacks[i]:
+            card = stacks[i][-1]
+            for foundation in foundations:
+                if is_valid_foundation_move(card, foundation):
+                    foundations[foundations.index(foundation)].append(card)
+                    stacks[i].remove(card)
+                    break
 
 # Check if the game is won
 def check_win():
@@ -143,7 +163,17 @@ def handle_click(pos):
                     selected_card = None
                     selected_stack = None
             break
-
+    for i in range(-1):
+        x = WIDTH - (i + 1) * (CARD_WIDTH + 10) - 10
+        y = 10
+        if x <= pos[0] <= x + CARD_WIDTH and y <= pos[1] <= y + CARD_HEIGHT:
+            if selected_card:
+                if is_valid_foundation_move(selected_card, foundations[i]):
+                    foundations[i].append(selected_card)
+                    stacks[selected_stack].remove(selected_card)
+                    selected_card = None
+                    selected_stack = None
+            break
 # Game loop
 running = True
 while running:
@@ -159,10 +189,16 @@ while running:
     # Draw cards
     draw_cards()
 
-    # Check for win
+    # Auto-move cards to foundation
+    auto_move_to_foundation()
+
+    # Draw game status
     if check_win():
-        print("Congratulations! You've won the game!")
+        game_won = True
+        draw_text("Congratulations! You've won the game!", (200, 300))
         running = False
+    else:
+        draw_text("Move cards to foundation piles.", (200, 20))
 
     pygame.display.flip()
     clock.tick(FPS)
