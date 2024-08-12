@@ -45,6 +45,7 @@ random.shuffle(cards)
 # Game state
 flipped_cards = [False] * len(cards)
 stacks = [[] for _ in range(7)]
+foundations = [[] for _ in range(4)]
 
 # Deal cards into stacks
 for i in range(7):
@@ -62,6 +63,14 @@ def draw_cards():
                 screen.blit(deck[card], (x, y))
             else:
                 pygame.draw.rect(screen, CARD_BACK_COLOR, (x, y, CARD_WIDTH, CARD_HEIGHT))
+
+    for i, foundation in enumerate(foundations):
+        x = WIDTH - (i + 1) * (CARD_WIDTH + 10) - 10
+        y = 10
+        if foundation:
+            screen.blit(deck[foundation[-1]], (x, y))
+        else:
+            pygame.draw.rect(screen, (255, 255, 255), (x, y, CARD_WIDTH, CARD_HEIGHT))
 
 # Flip a card
 def flip_card(stack_index):
@@ -83,6 +92,22 @@ def is_valid_move(card1, card2):
     value_order = {'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13}
 
     return color1 != color2 and value_order[value1] == value_order[value2] - 1
+
+def is_valid_foundation_move(card, foundation):
+    value = card.split('_')[0]
+    suit = card.split('_')[2]
+    if not foundation:
+        return value == 'A'
+    top_card = foundation[-1]
+    top_value = top_card.split('_')[0]
+    top_suit = top_card.split('_')[2]
+    value_order = {'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13}
+
+    return suit == top_suit and value_order[value] == value_order[top_value] + 1
+
+# Check if the game is won
+def check_win():
+    return all(len(foundation) == 13 for foundation in foundations)
 
 # Handle clicks
 selected_card = None
@@ -107,6 +132,17 @@ def handle_click(pos):
                     selected_card = None
                     selected_stack = None
             break
+    for i in range(4):
+        x = WIDTH - (i + 1) * (CARD_WIDTH + 10) - 10
+        y = 10
+        if x <= pos[0] <= x + CARD_WIDTH and y <= pos[1] <= y + CARD_HEIGHT:
+            if selected_card:
+                if is_valid_foundation_move(selected_card, foundations[i]):
+                    foundations[i].append(selected_card)
+                    stacks[selected_stack].remove(selected_card)
+                    selected_card = None
+                    selected_stack = None
+            break
 
 # Game loop
 running = True
@@ -122,6 +158,11 @@ while running:
 
     # Draw cards
     draw_cards()
+
+    # Check for win
+    if check_win():
+        print("Congratulations! You've won the game!")
+        running = False
 
     pygame.display.flip()
     clock.tick(FPS)
