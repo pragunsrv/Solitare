@@ -34,19 +34,43 @@ deck = load_card_images()
 cards = list(deck.keys())
 random.shuffle(cards)
 
+# Game state
+stacked_cards = []
+flipped_cards = [False] * len(cards)
+
+def draw_cards():
+    for i, card in enumerate(cards[:7]):
+        if flipped_cards[i]:
+            screen.blit(deck[card], (i * (CARD_WIDTH + 10) + 10, 50))
+        else:
+            pygame.draw.rect(screen, CARD_BACK_COLOR, (i * (CARD_WIDTH + 10) + 10, 50, CARD_WIDTH, CARD_HEIGHT))
+
+# Flip a card
+def flip_card(index):
+    flipped_cards[index] = not flipped_cards[index]
+
+# Handle clicks
+def handle_click(pos):
+    for i in range(7):
+        x = i * (CARD_WIDTH + 10) + 10
+        if x <= pos[0] <= x + CARD_WIDTH and 50 <= pos[1] <= 50 + CARD_HEIGHT:
+            flip_card(i)
+            break
+
 # Game loop
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            handle_click(event.pos)
 
     # Draw background
     screen.fill(BACKGROUND_COLOR)
 
-    # Draw cards (basic)
-    for i, card in enumerate(cards[:7]):
-        screen.blit(deck[card], (i * (CARD_WIDTH + 10) + 10, 50))
+    # Draw cards
+    draw_cards()
 
     pygame.display.flip()
     clock.tick(FPS)
