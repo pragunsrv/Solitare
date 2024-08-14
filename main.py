@@ -7,7 +7,6 @@ pygame.init()
 # Constants
 WIDTH, HEIGHT = 800, 600
 CARD_WIDTH, CARD_HEIGHT = 70, 100
-BACKGROUND_COLOR = (0, 128, 0)
 CARD_BACK_COLOR = (0, 0, 128)
 FPS = 30
 FONT_COLOR = (255, 255, 255)
@@ -19,6 +18,9 @@ SUIT_COLORS = {
     'clubs': (0, 0, 0),
     'spades': (0, 0, 0)
 }
+
+# Random background color
+BACKGROUND_COLOR = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
 # Load images
 def load_card_images():
@@ -51,6 +53,9 @@ flipped_cards = [False] * len(cards)
 stacks = [[] for _ in range(7)]
 foundations = [[] for _ in range(4)]
 game_won = False
+dragging_card = None
+dragging_offset_x = 0
+dragging_offset_y = 0
 
 # Deal cards into stacks
 for i in range(7):
@@ -98,7 +103,7 @@ def is_valid_move(card1, card2):
     color1 = SUIT_COLORS[suit1]
     color2 = SUIT_COLORS[suit2]
 
-    value_order = {'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13}
+    value_order = {'A': 1, '2': 2, '3': 3', '4': 4, '5': 5', '6': 6', '7': 7', '8': 8', '9': 9', '10': 10', 'J': 11', 'Q': 12', 'K': 13}
 
     return color1 != color2 and value_order[value1] == value_order[value2] - 1
 
@@ -110,7 +115,7 @@ def is_valid_foundation_move(card, foundation):
     top_card = foundation[-1]
     top_value = top_card.split('_')[0]
     top_suit = top_card.split('_')[2]
-    value_order = {'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13}
+    value_order = {'A': 1, '2': 2, '3': 3', '4': 4, '5': 5', '6': 6', '7': 7', '8': 8', '9': 9', '10': 10', 'J': 11', 'Q': 12', 'K': 13}
 
     return suit == top_suit and value_order[value] == value_order[top_value] + 1
 
@@ -129,51 +134,40 @@ def auto_move_to_foundation():
 def check_win():
     return all(len(foundation) == 13 for foundation in foundations)
 
-# Handle clicks
-selected_card = None
-selected_stack = None
+# Handle drag-and-drop
+def handle_drag(pos):
+    global dragging_card, dragging_offset_x, dragging_offset_y
+    for i in range(7):
+        x = i * (CARD_WIDTH + 10) + 10
+        y = 50 + len(stacks[i]) * 20
+        if dragging_card is None and stacks[i]:
+            if x <= pos[0] <= x + CARD_WIDTH and y <= pos[1] <= y + CARD_HEIGHT:
+                dragging_card = stacks[i][-1]
+                dragging_offset_x = pos[0] - x
+                dragging_offset_y = pos[1] - y
+                stacks[i].remove(dragging_card)
+                break
 
-def handle_click(pos):
-    global selected_card, selected_stack
+def handle_drop(pos):
+    global dragging_card
     for i in range(7):
         x = i * (CARD_WIDTH + 10) + 10
         if x <= pos[0] <= x + CARD_WIDTH:
-            if selected_card is None:
-                if stacks[i]:
-                    selected_card = stacks[i][-1]
-                    selected_stack = i
-            else:
-                if is_valid_move(selected_card, stacks[i][-1] if stacks[i] else None):
-                    stacks[i].append(selected_card)
-                    stacks[selected_stack].remove(selected_card)
-                    selected_card = None
-                    selected_stack = None
-                else:
-                    selected_card = None
-                    selected_stack = None
-            break
+            if is_valid_move(dragging_card, stacks[i][-1] if stacks[i] else None):
+                stacks[i].append(dragging_card)
+                dragging_card = None
+                return
     for i in range(4):
         x = WIDTH - (i + 1) * (CARD_WIDTH + 10) - 10
         y = 10
         if x <= pos[0] <= x + CARD_WIDTH and y <= pos[1] <= y + CARD_HEIGHT:
-            if selected_card:
-                if is_valid_foundation_move(selected_card, foundations[i]):
-                    foundations[i].append(selected_card)
-                    stacks[selected_stack].remove(selected_card)
-                    selected_card = None
-                    selected_stack = None
-            break
-    for i in range(-1):
-        x = WIDTH - (i + 1) * (CARD_WIDTH + 10) - 10
-        y = 10
-        if x <= pos[0] <= x + CARD_WIDTH and y <= pos[1] <= y + CARD_HEIGHT:
-            if selected_card:
-                if is_valid_foundation_move(selected_card, foundations[i]):
-                    foundations[i].append(selected_card)
-                    stacks[selected_stack].remove(selected_card)
-                    selected_card = None
-                    selected_stack = None
-            break
+            if is_valid_foundation_move(dragging_card, foundations[i]):
+                foundations[i].append(dragging_card)
+                dragging_card = None
+                return
+    stacks[selected_stack].append(dragging_card)
+    dragging_card = None
+
 # Game loop
 running = True
 while running:
@@ -181,7 +175,9 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            handle_click(event.pos)
+            handle_drag(event.pos)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            handle_drop(event.pos)
 
     # Draw background
     screen.fill(BACKGROUND_COLOR)
@@ -199,6 +195,11 @@ while running:
         running = False
     else:
         draw_text("Move cards to foundation piles.", (200, 20))
+
+    # Handle dragging
+    if dragging_card:
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        screen.blit(deck[dragging_card], (mouse_x - dragging_offset_x, mouse_y - dragging_offset_y))
 
     pygame.display.flip()
     clock.tick(FPS)
